@@ -1,77 +1,77 @@
-# Роли доступа (Access Roles)
+# Access Roles
 
-*Home Assistant integration: per-user access to areas, devices and entities, set up in the UI. UI in English, Ukrainian and Russian; documentation in Russian.*
+**English** | [Українська](README.uk.md)
 
-Кастомная интеграция Home Assistant: разграничение прав пользователей через интерфейс. Роль задаёт, какие зоны, устройства и объекты пользователь **видит** и чем **управляет**.
+A Home Assistant custom integration: per-user access set up in the UI. A role defines which areas, devices and entities a user **sees** and which ones they **operate**.
 
-## Как это работает
+## How it works
 
-В ядре Home Assistant права на уровне объектов уже есть:
-- пользователь входит в группы, у группы есть политика: чтение и управление по объектам, устройствам, зонам;
-- ядро проверяет эти права при отдаче состояний (REST, WebSocket, браузер) и при командах к объектам.
+The Home Assistant core already has per-entity permissions:
+- a user belongs to groups, and a group has a policy: read and control by entity, device and area;
+- the core checks these permissions when it serves states (REST, WebSocket, browser) and for entity actions.
 
-Нет только интерфейса, где их задать. Интеграция его добавляет: каждая роль становится группой, а пользователи роли — её членами.
+There is just no UI to set them. This integration adds it: each role becomes a group, and the role's users become its members.
 
-- **Видит:** пользователь получает состояния и историю только этих зон, устройств и объектов (исключения — в «Ограничениях»).
-- **Управляет:** команды к другим объектам HA отклоняет с ошибкой «Unauthorized». Право «управляет» включает «видит».
-- **Зона** охватывает все устройства зоны и их объекты, **устройство** — все свои объекты.
-- **Несколько ролей:** права складываются.
-- **Администраторы** не ограничиваются. В «Ремонтах» появится предупреждение, если администратор выбран в роли.
+- **Sees:** the user receives states and history only of these areas, devices and entities (for exceptions see "Limitations").
+- **Operates:** Home Assistant refuses actions on other entities with an "Unauthorized" error. "Operates" includes "Sees".
+- **An area** covers all devices in it and their entities, **a device** covers all its entities.
+- **Several roles:** permissions add up.
+- **Administrators** are not restricted. A warning appears under Repairs if an administrator is selected in a role.
 
-## Установка и настройка
+## Installation and setup
 
-1. **Установка.**
+1. **Install.**
    - HACS: Custom repositories → `https://github.com/alx2080/access_roles` (Integration).
-   - Или вручную: скопировать `custom_components/access_roles` в `config/custom_components/`.
+   - Or manually: copy `custom_components/access_roles` to `config/custom_components/`.
 
-   После установки перезапустить HA.
-2. «Настройки → Устройства и службы → Добавить интеграцию → Роли доступа».
-3. На карточке интеграции нажмите **«+ Добавить роль»**: название, пользователи, «Видит» и «Управляет».
-4. Изменить или удалить роль: «⋮» у роли. Изменения применяются сразу, у пользователя — после обновления страницы.
+   Then restart Home Assistant.
+2. Settings → Devices & services → Add integration → Access Roles.
+3. On the integration card press **+ Add role**: name, users, "Sees" and "Operates".
+4. To edit or delete a role use ⋮ next to it. Changes apply immediately; the user sees them after reloading the page.
 
-Пользователей создают как обычно, в «Настройки → Люди», **без** флажка «Администратор».
+Create users as usual under Settings → People, **without** the "Administrator" checkbox.
 
-## Безопасность
+## Safety
 
-- **Выключение интеграции** не снимает ограничения ролей: группы хранит сам Home Assistant в `.storage/auth`. Но дополнительная защита чтения (ниже) после перезапуска HA без интеграции не работает.
-- **Правка пользователя в «Людях»** сбрасывает его группы; интеграция сразу возвращает роль.
-- **Удаление интеграции** возвращает каждому пользователю группы, которые были у него до ролей.
-- **После обновления HA** интеграция проверяет внутренности авторизации. Если что-то изменилось, ничего не меняет и сообщает в «Ремонтах». Ранее назначенные ограничения остаются.
+- **Disabling the integration** does not lift the role restrictions: Home Assistant itself keeps the groups in `.storage/auth`. But the additional read protection (below) does not work after a Home Assistant restart without the integration.
+- **Editing a user under People** resets their groups; the integration puts the role back right away.
+- **Removing the integration** gives every user back the groups they had before the roles.
+- **After a Home Assistant update** the integration checks the authorization internals. If something changed, it changes nothing and reports it under Repairs. Restrictions applied earlier stay in force.
 
-## Проверка прав
+## Checking permissions
 
-Сервис (только для администраторов) `access_roles.check` показывает, что пользователь может делать с объектами:
+The action `access_roles.check` (administrators only) shows what a user may do with entities:
 
 ```yaml
 action: access_roles.check
 data:
-  user: Оператор
+  user: Operator
   entity_id: [sensor.temp_1, switch.pump_1]
 ```
 
-## Защита чтения
+## Read protection
 
-Ядро Home Assistant 2026.11.2 проверяет права для состояний, истории и команд к объектам, но часть данных отдаёт любому пользователю. Для ограниченных пользователей интеграция закрывает:
+The Home Assistant 2026.11.2 core checks permissions for states, history and entity actions, but serves part of the data to any user. For restricted users the integration closes:
 
-| Что | Как |
+| What | How |
 |---|---|
-| шаблоны (`render_template`), `subscribe_condition`, предпросмотры (`*/start_preview`) | запрещены |
-| журнал: WebSocket и `/api/logbook` | запрещён |
-| статистика (`recorder/*`) | только разрешённые объекты, списки пустые |
-| энергостатистика | запрещена |
-| списки дел, прогноз погоды, камеры (WebSocket) | только разрешённые объекты |
+| templates (`render_template`), `subscribe_condition`, previews (`*/start_preview`) | refused |
+| logbook: WebSocket and `/api/logbook` | refused |
+| statistics (`recorder/*`) | allowed entities only, lists are empty |
+| energy statistics | refused |
+| to-do lists, weather forecast, cameras (WebSocket) | allowed entities only |
 
-Поэтому у ограниченных пользователей **не работают «Активность» и карточки на шаблонах** (например, Markdown). Администраторов и обычных пользователей без роли это не касается.
+That is why **Activity and template-based cards** (for example Markdown) **do not work** for restricted users. Administrators and ordinary users without a role are not affected.
 
-Если в новой версии HA какой-то из этих входов журнала, статистики или шаблонов не удалось закрыть, появится сообщение в «Ремонтах».
+If one of these logbook, statistics or template entry points cannot be closed on a newer Home Assistant version, a message appears under Repairs.
 
-## Ограничения
+## Limitations
 
-> **Это не защита секретных данных.** Закрыт известный список команд. О командах других интеграций и новых версий HA интеграция не знает.
+> **This does not protect confidential data.** A known list of commands is closed. The integration does not know about commands of other integrations or of newer Home Assistant versions.
 
-- **Не закрыто:** голосовой помощник Assist (видит объекты, открытые ему в настройках), HTTP-ссылки камер, названия в реестрах устройств и объектов, команды сторонних интеграций.
-- **Действия без объекта** (`mqtt.publish`, уведомления и т.п.) права на объекты не ограничивают.
-- **Первые секунды после запуска HA:** подписка, открытая до загрузки интеграции, остаётся до переподключения.
-- **Панели не скрываются автоматически.** Карточки недоступных объектов показывают, что объект недоступен.
+- **Not closed:** the Assist voice assistant (it sees entities exposed to it in the settings), HTTP links of cameras, names in the device and entity registries, commands of third-party integrations.
+- **Actions without an entity** (`mqtt.publish`, notifications and so on) are not limited by entity permissions.
+- **The first seconds after Home Assistant starts:** a subscription opened before the integration has loaded stays until it reconnects.
+- **Dashboards are not hidden automatically.** Cards of entities that are not allowed show that the entity is unavailable.
 
-**Что проверено** на Home Assistant 2026.11.2 под входом ограниченного пользователя (роль «Видит: одно устройство»): состояния, история, журнал, статистика, шаблоны, условия, списки дел, прогноз погоды, отказ в действиях. Разрешающее «Управляет», камеры, энергостатистика, предпросмотры и удаление плагина вживую не проверялись.
+**What was tested** on Home Assistant 2026.11.2 signed in as a restricted user (a role that sees one device): states, history, logbook, statistics, templates, conditions, to-do lists, weather forecast, refused actions. A role that allows "Operates", cameras, energy statistics, previews and removal of the integration were not tested live.
