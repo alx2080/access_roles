@@ -1,5 +1,7 @@
 # Роли доступа (Access Roles)
 
+*Home Assistant integration: per-user access to areas, devices and entities, set up in the UI. UI in English, Ukrainian and Russian; documentation in Russian.*
+
 Кастомная интеграция Home Assistant: разграничение прав пользователей через интерфейс. Роль задаёт, какие зоны, устройства и объекты пользователь **видит** и чем **управляет**.
 
 ## Как это работает
