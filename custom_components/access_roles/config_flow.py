@@ -15,7 +15,7 @@ from homeassistant.config_entries import (
     SubentryFlowResult,
 )
 from homeassistant.const import CONF_NAME
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.selector import (
     AreaSelector,
     AreaSelectorConfig,
@@ -29,6 +29,7 @@ from homeassistant.helpers.selector import (
     SelectSelectorMode,
     TextSelector,
 )
+from homeassistant.helpers.translation import async_get_translations
 
 try:  # Home Assistant 2026.x moved from voluptuous to probatio
     import probatio as vol
@@ -49,6 +50,12 @@ from .const import (
 )
 
 
+async def _text(hass: HomeAssistant, category: str, key: str, default: str) -> str:
+    """Text in the language of the Home Assistant server."""
+    texts = await async_get_translations(hass, hass.config.language, category, {DOMAIN})
+    return texts.get(f"component.{DOMAIN}.{category}.{key}", default)
+
+
 class AccessRolesConfigFlow(ConfigFlow, domain=DOMAIN):
     """Add Access Roles (single instance)."""
 
@@ -63,7 +70,8 @@ class AccessRolesConfigFlow(ConfigFlow, domain=DOMAIN):
         await self.async_set_unique_id(DOMAIN)
         self._abort_if_unique_id_configured()
         if user_input is not None:
-            return self.async_create_entry(title="Роли доступа", data={})
+            title = await _text(self.hass, "config", "step.user.title", "Access Roles")
+            return self.async_create_entry(title=title, data={})
         return self.async_show_form(step_id="user", data_schema=vol.Schema({}))
 
 
@@ -71,12 +79,13 @@ class RoleSubentryFlow(ConfigSubentryFlow):
     """Add or edit one role."""
 
     async def _user_options(self) -> list[SelectOptionDict]:
+        unrestricted = await _text(self.hass, "common", "administrator", "administrator, not restricted")
         options = []
         for user in await self.hass.auth.async_get_users():
             if user.system_generated:
                 continue
             admin = user.is_owner or any(g.id == GROUP_ID_ADMIN for g in user.groups)
-            label = (user.name or user.id) + (" (администратор — не ограничивается)" if admin else "")
+            label = (user.name or user.id) + (f" ({unrestricted})" if admin else "")
             options.append(SelectOptionDict(value=user.id, label=label))
         return sorted(options, key=lambda o: o["label"].lower())
 

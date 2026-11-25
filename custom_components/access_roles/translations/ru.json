@@ -1,4 +1,7 @@
 {
+  "common": {
+    "administrator": "администратор — не ограничивается"
+  },
   "config": {
     "abort": {
       "already_configured": "Роли доступа уже добавлены.",

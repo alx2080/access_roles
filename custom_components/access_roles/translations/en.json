@@ -1,4 +1,7 @@
 {
+  "common": {
+    "administrator": "administrator, not restricted"
+  },
   "config": {
     "abort": {
       "already_configured": "Access Roles is already set up.",
