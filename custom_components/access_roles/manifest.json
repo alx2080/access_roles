@@ -4,7 +4,7 @@
   "after_dependencies": ["logbook", "recorder"],
   "codeowners": ["@alx2080"],
   "config_flow": true,
-  "dependencies": ["websocket_api"],
+  "dependencies": ["http", "websocket_api"],
   "documentation": "https://github.com/alx2080/access_roles",
   "integration_type": "service",
   "iot_class": "calculated",
