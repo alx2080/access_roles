@@ -55,6 +55,10 @@
     }
   },
   "issues": {
+    "guard_incomplete": {
+      "title": "Access Roles: read protection is incomplete",
+      "description": "On Home Assistant {version} these could not be protected: {missing}. Restricted users can read data this way. Update the Access Roles integration."
+    },
     "incompatible": {
       "title": "Access roles not applied",
       "description": "Home Assistant {version} authorization internals are not as expected: {reason}. Roles were not applied; restrictions applied earlier stay in force. Update the Access Roles integration."

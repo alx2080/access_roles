@@ -13,6 +13,7 @@ gives every user back the groups they had before.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -53,6 +54,10 @@ def _auth_store(hass: HomeAssistant):
     return store
 
 
+def _is_admin(user: User) -> bool:
+    return user.is_owner or any(g.id == GROUP_ID_ADMIN for g in user.groups)
+
+
 def build_policy(data: dict[str, Any]) -> dict[str, Any]:
     """The Home Assistant policy of one role."""
     entities: dict[str, dict[str, dict[str, bool]]] = {}
@@ -81,12 +86,17 @@ class RoleManager:
         # user_id -> group ids the user had before a role was applied
         self._store: Store[dict[str, list[str]]] = Store(hass, STORE_VERSION, STORE_KEY, private=True)
         self.original: dict[str, list[str]] = {}
+        self._lock = asyncio.Lock()
 
     async def async_load(self) -> None:
         self.original = await self._store.async_load() or {}
 
     async def async_apply(self, roles: dict[str, tuple[str, dict[str, Any]]]) -> dict[str, Any]:
         """roles: subentry_id -> (title, data). Returns a summary."""
+        async with self._lock:
+            return await self._apply(roles)
+
+    async def _apply(self, roles: dict[str, tuple[str, dict[str, Any]]]) -> dict[str, Any]:
         store = _auth_store(self.hass)
         users = {u.id: u for u in await self.hass.auth.async_get_users()}
 
@@ -112,7 +122,7 @@ class RoleManager:
                 user = users.get(user_id)
                 if user is None or user.system_generated:
                     continue
-                if user.is_owner or any(g.id == GROUP_ID_ADMIN for g in user.groups):
+                if _is_admin(user):
                     skipped_admins.append(user.name or user_id)
                     continue
                 user_roles.setdefault(user_id, []).append(GROUP_PREFIX + role_id)
@@ -122,15 +132,16 @@ class RoleManager:
             user = users[user_id]
             if user_id not in self.original:
                 self.original[user_id] = [g.id for g in user.groups if not g.id.startswith(GROUP_PREFIX)]
-            await self.hass.auth.async_update_user(user, group_ids=gids)
+            # Only when it differs: an update fires an event that leads here again.
+            if {g.id for g in user.groups} != set(gids):
+                await self.hass.auth.async_update_user(user, group_ids=gids)
 
         # 4. Users no longer in any role get their old groups back.
         #    (Someone made admin in the meantime keeps being admin.)
         for user_id in [u for u in self.original if u not in user_roles]:
             saved = self.original.pop(user_id)
             user = users.get(user_id)
-            if user is not None and not any(g.id == GROUP_ID_ADMIN for g in user.groups):
-                await self._restore_user(user, saved)
+            await self._restore_user(user, saved)
 
         # 5. Drop groups of deleted roles (nobody is in them any more).
         for gid in [g for g in store._groups if g.startswith(GROUP_PREFIX) and g not in wanted]:  # noqa: SLF001
@@ -151,8 +162,8 @@ class RoleManager:
         return {"roles": len(wanted), "users": len(user_roles), "skipped_admins": skipped_admins}
 
     async def _restore_user(self, user: User | None, group_ids: list[str]) -> None:
-        if user is None:
-            return
+        if user is None or _is_admin(user):
+            return  # made an administrator in the meantime: stays one
         store = _auth_store(self.hass)
         valid = [g for g in group_ids if g in store._groups] or [GROUP_ID_USER]  # noqa: SLF001
         await self.hass.auth.async_update_user(user, group_ids=valid)

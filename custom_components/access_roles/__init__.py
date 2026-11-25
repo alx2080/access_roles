@@ -11,9 +11,10 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from homeassistant.auth import EVENT_USER_UPDATED
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import __version__ as HA_VERSION
-from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
+from homeassistant.core import Event, HomeAssistant, ServiceCall, SupportsResponse, callback
 from homeassistant.exceptions import ConfigEntryError
 from homeassistant.helpers import config_validation as cv, issue_registry as ir
 from homeassistant.helpers.service import async_register_admin_service
@@ -23,7 +24,8 @@ try:  # Home Assistant 2026.x moved from voluptuous to probatio
 except ImportError:  # pragma: no cover
     import voluptuous as vol
 
-from .const import DOMAIN, SUBENTRY_ROLE
+from .const import CONF_USERS, DOMAIN, SUBENTRY_ROLE
+from .guard import async_install
 from .roles import RoleManager, RolesUnavailable
 
 _LOGGER = logging.getLogger(__name__)
@@ -38,6 +40,20 @@ def _roles(entry: ConfigEntry) -> dict[str, tuple[str, dict[str, Any]]]:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    @callback
+    def _guard_ready(missing: list[str]) -> None:
+        if missing:
+            _LOGGER.error("access_roles: not protected: %s", ", ".join(missing))
+            ir.async_create_issue(
+                hass, DOMAIN, "guard_incomplete", is_fixable=False, severity=ir.IssueSeverity.ERROR,
+                translation_key="guard_incomplete",
+                translation_placeholders={"missing": ", ".join(missing), "version": HA_VERSION})
+        else:
+            ir.async_delete_issue(hass, DOMAIN, "guard_incomplete")
+
+    # First: groups applied earlier stay in force even if the roles cannot be.
+    async_install(hass, _guard_ready)
+
     manager = RoleManager(hass)
     await manager.async_load()
     try:
@@ -49,6 +65,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             translation_placeholders={"reason": str(err), "version": HA_VERSION})
         raise ConfigEntryError(str(err)) from err
     ir.async_delete_issue(hass, DOMAIN, "incompatible")
+    _report_admins(hass, summary)
+    _LOGGER.info("access_roles: %s roles applied to %s users", summary["roles"], summary["users"])
+    entry.runtime_data = manager
+
+    async def _user_updated(event: Event) -> None:
+        """Editing a user in the UI resets the groups: put the role back."""
+        roles = _roles(entry)
+        if any(event.data["user_id"] in (data.get(CONF_USERS) or []) for _t, data in roles.values()):
+            _report_admins(hass, await manager.async_apply(roles))
+
+    entry.async_on_unload(hass.bus.async_listen(EVENT_USER_UPDATED, _user_updated))
+    _register_services(hass)
+    entry.async_on_unload(entry.add_update_listener(_async_reload))
+    return True
+
+
+@callback
+def _report_admins(hass: HomeAssistant, summary: dict[str, Any]) -> None:
     if summary["skipped_admins"]:
         ir.async_create_issue(
             hass, DOMAIN, "admins_in_roles", is_fixable=False, severity=ir.IssueSeverity.WARNING,
@@ -56,11 +90,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             translation_placeholders={"users": ", ".join(summary["skipped_admins"])})
     else:
         ir.async_delete_issue(hass, DOMAIN, "admins_in_roles")
-    _LOGGER.info("access_roles: %s roles applied to %s users", summary["roles"], summary["users"])
-    entry.runtime_data = manager
-    _register_services(hass)
-    entry.async_on_unload(entry.add_update_listener(_async_reload))
-    return True
 
 
 async def _async_reload(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -82,7 +111,7 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
         await manager.async_remove_all()
     except RolesUnavailable as err:
         _LOGGER.error("access_roles: could not restore user groups: %s", err)
-    for issue in ("incompatible", "admins_in_roles"):
+    for issue in ("incompatible", "admins_in_roles", "guard_incomplete"):
         ir.async_delete_issue(hass, DOMAIN, issue)
 
 
