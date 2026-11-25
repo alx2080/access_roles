@@ -1,0 +1,13 @@
+{
+  "domain": "access_roles",
+  "name": "Access Roles",
+  "codeowners": ["@alx2080"],
+  "config_flow": true,
+  "documentation": "https://github.com/alx2080/access_roles",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/alx2080/access_roles/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "0.1.1"
+}

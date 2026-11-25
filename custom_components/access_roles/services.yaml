@@ -1,0 +1,11 @@
+check:
+  fields:
+    user:
+      required: true
+      selector:
+        text:
+    entity_id:
+      required: true
+      selector:
+        entity:
+          multiple: true

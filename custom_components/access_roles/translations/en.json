@@ -1,0 +1,77 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Access Roles is already set up.",
+      "single_instance_allowed": "Access Roles is already set up."
+    },
+    "step": {
+      "user": {
+        "title": "Access Roles",
+        "description": "Roles limit what regular (non-administrator) users can see and operate. Add roles with \"+ Add role\" on the integration card. Administrators are never restricted."
+      }
+    }
+  },
+  "config_subentries": {
+    "role": {
+      "entry_type": "Role",
+      "initiate_flow": {"user": "Add role"},
+      "step": {
+        "user": {
+          "title": "Role",
+          "description": "Users of the role see only what \"Sees\" and \"Operates\" allow and can operate only what \"Operates\" allows. An area covers all devices in it and their entities, a device covers all its entities. Permissions of several roles add up.",
+          "data": {
+            "name": "Role name",
+            "users": "Users",
+            "read_areas": "Sees: areas",
+            "read_devices": "Sees: devices",
+            "read_entities": "Sees: entities",
+            "control_areas": "Operates: areas",
+            "control_devices": "Operates: devices",
+            "control_entities": "Operates: entities"
+          }
+        },
+        "reconfigure": {
+          "title": "Edit role",
+          "description": "Changes apply immediately. Pages a user already has open update after a page reload.",
+          "data": {
+            "name": "Role name",
+            "users": "Users",
+            "read_areas": "Sees: areas",
+            "read_devices": "Sees: devices",
+            "read_entities": "Sees: entities",
+            "control_areas": "Operates: areas",
+            "control_devices": "Operates: devices",
+            "control_entities": "Operates: entities"
+          }
+        }
+      },
+      "error": {
+        "name_required": "Enter a role name.",
+        "nothing_allowed": "The role allows nothing: pick at least one area, device or entity."
+      },
+      "abort": {
+        "reconfigure_successful": "Role updated."
+      }
+    }
+  },
+  "issues": {
+    "incompatible": {
+      "title": "Access roles not applied",
+      "description": "Home Assistant {version} authorization internals are not as expected: {reason}. Roles were not applied; restrictions applied earlier stay in force. Update the Access Roles integration."
+    },
+    "admins_in_roles": {
+      "title": "Administrators in roles",
+      "description": "These users are administrators and are not restricted by roles: {users}. Clear \"Administrator\" for them under Settings → People if they should be restricted."
+    }
+  },
+  "services": {
+    "check": {
+      "name": "Check permissions",
+      "description": "What a user may do with entities: see (read) and operate (control).",
+      "fields": {
+        "user": {"name": "User", "description": "User name or id."},
+        "entity_id": {"name": "Entities", "description": "Entities to check."}
+      }
+    }
+  }
+}
